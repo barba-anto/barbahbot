@@ -40,8 +40,9 @@ class MyBot(commands.Bot):
         if content.startswith("dickpick"):
             await message.reply("Hello!", mention_author=True)
 
-        if content.find("stfu") >= 0:
-            await message.channel.send(f"Yeah, stfu {content[len('stfu'):]}")
+        idx = content.find("stfu")
+        if idx >= 0:
+            await message.channel.send(f"Yeah, stfu {content[idx+len('stfu'):]}")
 
         await self.process_commands(message)
 
