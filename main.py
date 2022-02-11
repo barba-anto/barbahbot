@@ -1,12 +1,12 @@
-# This example requires the 'members' privileged intents
-
-import random
 import discord
 import os
 from discord.ext import commands, tasks
 from datetime import datetime
 
-from tasks import daily_tasks
+import datastorage
+from datastorage import update_daily_task, update_weekly_task, get_guilds_ids
+
+from logging_setup import get_logger
 
 description = """An example bot to showcase the discord.ext.commands extension
 module.
@@ -14,6 +14,8 @@ There are a number of utility commands being showcased here."""
 
 intents = discord.Intents.default()
 intents.members = True
+
+_LOGGER = get_logger(__name__)
 
 
 class MyBot(commands.Bot):
@@ -27,8 +29,8 @@ class MyBot(commands.Bot):
         self.my_background_task.start()
 
     async def on_ready(self):
-        print(f"Logged in as {bot.user} (ID: {bot.user.id})")
-        print("------")
+        _LOGGER.info(f"Logged in as {bot.user} (ID: {bot.user.id})")
+        _LOGGER.info("------")
 
     async def on_message(self, message: discord.Message):
         content = message.content.lower()
@@ -42,22 +44,33 @@ class MyBot(commands.Bot):
 
         idx = content.find("stfu")
         if idx >= 0:
-            await message.channel.send(f"Yeah, stfu {content[idx+len('stfu'):]}")
+            await message.channel.send(f"Yeah, stfu {content[idx + len('stfu'):]}")
 
         await self.process_commands(message)
 
     @tasks.loop(seconds=1)  # Task that runs every 60 seconds
     async def my_background_task(self):
         now = datetime.now()
-        now_ymd = now.strftime('%Y-%m-%d')
         now_hm = now.strftime('%H:%M')
-        for ch_id, ch_tasks in daily_tasks.items():
-            ch = self.get_channel(ch_id)
-            for task in ch_tasks:
-                if now_hm == task['execution_time'] and task['last_execution'] != now_ymd:
-                    print("Executing task!")
-                    await ch.send(task['text'])
-                    task['last_execution'] = now_ymd
+        now_ymdhm = now.strftime('%Y-%m-%d %H:%M')
+        weekday = str(now.weekday())
+        for guild in datastorage.localstorage.keys():
+            for ch_id in datastorage.localstorage[guild].keys():
+                ch = self.get_channel(int(ch_id))
+                if ch:
+                    for task_id, t in enumerate(datastorage.get_daily_tasks(guild, ch_id)):
+                        if now_hm == t['time'] and t['last_execution'] != now_ymdhm:
+                            _LOGGER.info(f"Executing daily task {task_id}!")
+                            await ch.send(t['text'])
+                            update_daily_task(guild, ch_id, task_id, time=t['time'], text=t['text'],
+                                              last_execution=now_ymdhm)
+                    for task_id, t in enumerate(datastorage.get_weekly_tasks(guild, ch_id)):
+                        if ch:
+                            if weekday == t['day'] and now_hm == t['time'] and t['last_execution'] != now_ymdhm:
+                                _LOGGER.info(f"Executing weekly task {task_id}!")
+                                await ch.send(t['text'])
+                                update_weekly_task(guild, ch_id, task_id, day=t['day'], time=t['time'],
+                                                   text=t['text'], last_execution=now_ymdhm)
 
 
 bot = MyBot(command_prefix="!", description=description, intents=intents)
@@ -74,30 +87,45 @@ async def daily(ctx: commands.context.Context, hhmm, *message):
         await ctx.reply("First argument not matching HH:MM format!")
         return
 
-    print("Adding to daily tasks")
-    if not daily_tasks.get(ctx.channel.id):
-        daily_tasks[ctx.channel.id] = []
-
-    daily_tasks[ctx.channel.id].append({
-        'execution_time': hhmm,
-        'last_execution': '',
-        'text': ' '.join(message)
-    })
-
-    print(ctx.channel.id, hhmm, message)
+    _LOGGER.info("Adding to daily tasks")
+    datastorage.new_daily_task(ctx.guild.id, ctx.channel.id, hhmm, ' '.join(message))
 
 
-@bot.command()
-async def roll(ctx, dice: str):
-    """Rolls a dice in NdN format."""
+@bot.slash_command(guild_ids=[int(g) for g in get_guilds_ids()])
+async def daily(ctx: discord.ApplicationContext, hhmm, message):
+    """Sends a message every day at a predetermined time. The time MUST be in HH:MM format.
+
+    Usage: /daily HH:MM PUT HERE YOUR MESSAGE
+    :param hhmm: "Use HH:MM format"
+    """
     try:
-        rolls, limit = map(int, dice.split("d"))
-    except Exception:
-        await ctx.send("Format has to be in NdN!")
+        datetime.strptime(hhmm, '%H:%M')
+    except ValueError:
+        await ctx.respond("First argument not matching HH:MM format!")
         return
 
-    result = ", ".join(str(random.randint(1, limit)) for r in range(rolls))
-    await ctx.send(result)
+    _LOGGER.info("Adding to daily tasks")
+    datastorage.new_daily_task(ctx.guild.id, ctx.channel.id, hhmm, message)
+    await ctx.respond("Daily reminder addedd succesfully")
+
+@bot.command()
+async def weekly(ctx: commands.context.Context, dayoftheweek, hhmm, *message):
+    """Sends a message every day at a predetermined time. The time MUST be in HH:MM format.
+
+    Usage: !daily HH:MM PUT HERE YOUR MESSAGE"""
+    try:
+        if int(dayoftheweek) < 0 or int(dayoftheweek) > 6:
+            raise ValueError
+    except ValueError:
+        await ctx.reply("The day of the week must be a number between 0 (Monday) and 6 (Sunday)")
+    try:
+        datetime.strptime(hhmm, '%H:%M')
+    except ValueError:
+        await ctx.reply("First argument not matching HH:MM format!")
+        return
+
+    _LOGGER.info("Adding to daily tasks")
+    datastorage.new_weekly_task(ctx.guild.id, ctx.channel.id, dayoftheweek, hhmm, ' '.join(message))
 
 
 bot.run(os.getenv('DISCORD_TOKEN'))
