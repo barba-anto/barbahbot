@@ -17,7 +17,7 @@ hhmm = discord.Option(str, name='hhmm', description="Time of the day at which "
 
 weekdays = discord.Option(str, name='day-of-the-week',
                           description='Day on which the task should run',
-                          choices=[enums.daysoftheweek])
+                          choices=enums.daysoftheweek)
 
 message = discord.Option(str, name="message",
                          description="The text that you want to send. "
