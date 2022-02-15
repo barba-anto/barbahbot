@@ -126,11 +126,12 @@ bot = MyBot(command_prefix="!", description=description, intents=intents)
 #                                ' '.join(message))
 
 
-@bot.slash_command()
+@bot.slash_command(guild_ids=DEBUG_SERVER_IDS)
 async def info(ctx):
     await ctx.respond("This bot was made by BarbaH#2895.\n"
                       "If you have any issue with the bot "
                       "just pretend you didn't see anything")
+
 
 @bot.slash_command(guild_ids=DEBUG_SERVER_IDS,
                    default_permissions=False)
