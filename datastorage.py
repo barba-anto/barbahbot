@@ -117,10 +117,11 @@ def update_daily_task(guild_id: int | str, channel_id: int | str, task_id: int,
     set_server_data(guild_id, localstorage[guild_id])
 
 
-def new_weekly_task(guild_id: int, channel_id: int, day: str, time: str,
+def new_weekly_task(guild_id: int, channel_id: int, day: int | str, time: str,
                     text: str):
     guild_id = str(guild_id)
     channel_id = str(channel_id)
+    day = str(day)
     new_task = {
         'day': day,
         'time': time,

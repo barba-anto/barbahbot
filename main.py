@@ -18,8 +18,8 @@ intents = discord.Intents.default()
 intents.members = True
 
 if os.getenv("DEBUG_SERVER_IDS", []):
-    # DEBUG_SERVER_IDS = [int(i) for i in os.getenv("DEBUG_SERVER_IDS").split(',')]
-    DEBUG_SERVER_IDS = [943104380448681987, 669694248756445225]
+    DEBUG_SERVER_IDS = [int(i) for i in os.getenv("DEBUG_SERVER_IDS").split(',')]
+    # DEBUG_SERVER_IDS = [943104380448681987, 669694248756445225]
 else:
     DEBUG_SERVER_IDS = None
 
@@ -140,10 +140,8 @@ async def weekly(ctx: discord.ApplicationContext,
                  dayoftheweek: options.weekdays,
                  hhmm: options.hhmm, message: options.message):
     """Sends a message once in a week at a predetermined day and time.
-    Days must be from 0 (MONDAY) to 6 (SUNDAY)
-    The time MUST be in HH:MM format.
 
-    Usage: /daily DAYFROMZEROTOSIX HH:MM PUT HERE YOUR MESSAGE
+    Usage: /daily DAYOFTHEWEEK HH:MM PUT HERE YOUR MESSAGE
     """
     if dayoftheweek.lower().strip() not in enums.daysoftheweek:
         await ctx.respond("This day of the week doesn't exists")
@@ -154,7 +152,7 @@ async def weekly(ctx: discord.ApplicationContext,
     except ValueError:
         await ctx.respond("The hhmm argument is not matching HH:MM format!")
         return
-
+    dayoftheweek = enums.daysoftheweek.index(dayoftheweek)
     _LOGGER.info("Adding to weekly tasks")
     datastorage.new_weekly_task(ctx.guild.id, ctx.channel.id,
                                 dayoftheweek, hhmm, message)
@@ -254,7 +252,7 @@ async def show_tasks(ctx: discord.ApplicationContext,
     for task_id, task in enumerate(_tasks):
         response += f"TASK {task_id}\n"
         if task_type == 'weekly':
-            response += f"Activation day: {task['day']}\n"
+            response += f"Activation day: {enums.daysoftheweek[int(task['day'])]}\n"
         response += f"Activation time: {task['time']}\n"
         response += f"Message: {task['text']}\n"
         response += f"##############\n\n"
