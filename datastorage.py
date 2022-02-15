@@ -10,9 +10,11 @@ Example of a guild data:
     }
 }
 """
+from __future__ import annotations
 
 import json
 import os
+
 import redis
 
 from logging_setup import get_logger
@@ -22,6 +24,7 @@ _LOGGER = get_logger(__name__)
 host, port = os.getenv("REDIS_URL").split(':')
 
 r = redis.Redis(host=host, port=port, password=os.getenv("REDIS_PASSWORD"))
+r.ping()
 _LOGGER.info("Redis login successful!")
 
 localstorage = dict()
@@ -39,21 +42,41 @@ def set_server_data(guild_id: int | str, data: dict):
     r.set(str(guild_id), json.dumps(data))
 
 
+def get_guilds_ids():
+    return localstorage.keys()
+
+
+def new_guild(guild_id: int | str):
+    r.set(str(guild_id), "{}")
+
+
+def delete_guild_data(guild_id: int | str):
+    r.delete(str(guild_id))
+
+
 def _get_channel_data(guild_id: int | str, channel_id: int | str) -> dict:
-    return localstorage.get(str(guild_id), {channel_id: {}}).get(str(channel_id))
+    guild_id = str(guild_id)
+    channel_id = str(channel_id)
+    return localstorage.get(str(guild_id), {channel_id: {}}).get(
+        str(channel_id))
 
 
 def get_daily_tasks(guild_id: int | str, channel_id: int | str) -> list:
+    guild_id = str(guild_id)
+    channel_id = str(channel_id)
     data = _get_channel_data(guild_id=guild_id, channel_id=channel_id)
     return data.get('daily', [])
 
 
 def get_weekly_tasks(guild_id: int | str, channel_id: int | str) -> list:
+    guild_id = str(guild_id)
+    channel_id = str(channel_id)
     data = _get_channel_data(guild_id=guild_id, channel_id=channel_id)
     return data.get('weekly', [])
 
 
-def new_daily_task(guild_id: int | str, channel_id: int | str, time: str, text: str):
+def new_daily_task(guild_id: int | str, channel_id: int | str, time: str,
+                   text: str):
     guild_id = str(guild_id)
     channel_id = str(channel_id)
     new_task = {
@@ -80,7 +103,10 @@ def new_daily_task(guild_id: int | str, channel_id: int | str, time: str, text: 
 
 
 def update_daily_task(guild_id: int | str, channel_id: int | str, task_id: int,
-                      time: str = None, text: str = None,  last_execution: str = None):
+                      time: str = None, text: str = None,
+                      last_execution: str = None):
+    guild_id = str(guild_id)
+    channel_id = str(channel_id)
     new_task = {
         'time': time,
         'text': text,
@@ -91,7 +117,8 @@ def update_daily_task(guild_id: int | str, channel_id: int | str, task_id: int,
     set_server_data(guild_id, localstorage[guild_id])
 
 
-def new_weekly_task(guild_id: int, channel_id: int, day: str, time: str, text: str):
+def new_weekly_task(guild_id: int, channel_id: int, day: str, time: str,
+                    text: str):
     guild_id = str(guild_id)
     channel_id = str(channel_id)
     new_task = {
@@ -110,8 +137,8 @@ def new_weekly_task(guild_id: int, channel_id: int, day: str, time: str, text: s
     else:
         channel_data = localstorage[guild_id].get(channel_id)
         if channel_data:
-            daily_tasks = localstorage[guild_id][channel_id].get('weekly', [])
-            if daily_tasks:
+            weekly_tasks = localstorage[guild_id][channel_id].get('weekly', [])
+            if weekly_tasks:
                 localstorage[guild_id][channel_id]['weekly'].append(new_task)
                 return
         localstorage[guild_id][channel_id]['weekly'] = [new_task]
@@ -119,8 +146,11 @@ def new_weekly_task(guild_id: int, channel_id: int, day: str, time: str, text: s
     set_server_data(guild_id, localstorage[guild_id])
 
 
-def update_weekly_task(guild_id: int | str, channel_id: int | str, task_id: int, day: str,
-                      time: str, text: str,  last_execution: str):
+def update_weekly_task(guild_id: int | str, channel_id: int | str,
+                       task_id: int, day: str,
+                       time: str, text: str, last_execution: str):
+    guild_id = str(guild_id)
+    channel_id = str(channel_id)
     new_task = {
         'day': day,
         'time': time,
@@ -132,8 +162,26 @@ def update_weekly_task(guild_id: int | str, channel_id: int | str, task_id: int,
     set_server_data(guild_id, localstorage[guild_id])
 
 
-def get_guilds_ids():
-    return localstorage.keys()
+def delete_daily_task(guild_id: int|str, channel_id: int|str, task_id: int):
+    guild_id = str(guild_id)
+    channel_id = str(channel_id)
+    if localstorage.get(guild_id):
+        channel_data = localstorage[guild_id].get(channel_id)
+        if channel_data:
+            daily_tasks = localstorage[guild_id][channel_id].get('daily', [])
+            if daily_tasks:
+                localstorage[guild_id][channel_id]['daily'].pop(task_id)
+
+
+def delete_weekly_task(guild_id: int|str, channel_id: int|str, task_id: int):
+    guild_id = str(guild_id)
+    channel_id = str(channel_id)
+    if localstorage.get(guild_id):
+        channel_data = localstorage[guild_id].get(channel_id)
+        if channel_data:
+            weekly_tasks = localstorage[guild_id][channel_id].get('weekly', [])
+            if weekly_tasks:
+                localstorage[guild_id][channel_id]['weekly'].pop(task_id)
 
 
 for key in r.keys():
